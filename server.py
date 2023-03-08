@@ -22,7 +22,7 @@
 
 
 import flask
-from flask import Flask, request, redirect
+from flask import Flask, request, redirect, make_response
 import json
 app = Flask(__name__)
 app.debug = True
@@ -33,9 +33,10 @@ app.debug = True
 #    'b':{'x':2, 'y':3}
 # }
 
-class World:
+class World:     
     def __init__(self):
         self.clear()
+        self.etag = ""
         
     def update(self, entity, key, value):
         entry = self.space.get(entity,dict())
@@ -72,6 +73,13 @@ def flask_post_json():
         return json.loads(request.form.keys()[0])
 
 
+def etagify(resp: flask.Response) -> flask.Response:
+    print('Has ETag:', "etag" in resp.headers)      # TODO: Erase debug statement
+    resp.add_etag()
+    myWorld.etag = resp.get_etag()[0]
+    return resp
+
+
 @app.route("/")
 def hello():
     '''Return something coherent here.. perhaps redirect to /static/index.html '''
@@ -84,13 +92,17 @@ def update(entity):
     update_data = flask_post_json()
     for key, val in update_data.items():
         myWorld.update(entity, key, val)
-    return myWorld.get(entity)
+    resp = make_response(myWorld.get(entity))
+    return etagify(resp)
 
 
 @app.route("/world", methods=['POST','GET'])    
 def world():
     '''you should probably return the world here'''
-    return myWorld.world()
+    resp = make_response(myWorld.world())
+    resp.set_etag(myWorld.etag)
+    print('Has ETag:', "etag" in resp.headers)      # TODO: Erase debug statement
+    return resp.make_conditional(request)
 
 
 @app.route("/entity/<entity>")    
@@ -103,7 +115,8 @@ def get_entity(entity):
 def clear():
     '''Clear the world out!'''
     myWorld.clear()
-    return myWorld.world()
+    resp = make_response(myWorld.world())
+    return etagify(resp)
 
 
 
