@@ -137,7 +137,7 @@ function getPosition(e) {
 function addEntity(entity, data) {
     world[entity] = data;
     drawNextFrame(); // (but should we?)
-    //XXX: Send a XHTML Request that updates the entity you just  modified!
+    //XXX: Send a XHTML Request that updates the entity you just modified!
 
 }
 
@@ -262,6 +262,9 @@ mouse.mousedraggers.push(function(x,y,clicked,e) {
 
 function update() {
     //XXX: TODO Get the world from the webservice using a XMLHTTPRequest
+    fetch("http://"+host+"/world", {headers: {
+        // TODO:
+    }})
     drawFrame();
 }
 
