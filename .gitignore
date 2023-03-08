@@ -37,3 +37,5 @@ nosetests.xml
 *~
 *.swp
 .vscode/settings.json
+test.ipynb
+static/temp.js
