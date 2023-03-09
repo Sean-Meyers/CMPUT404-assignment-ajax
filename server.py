@@ -36,7 +36,7 @@ app.debug = True
 class World:     
     def __init__(self):
         self.clear()
-        self.etag = ""
+        self.etag = "test"
         
     def update(self, entity, key, value):
         entry = self.space.get(entity,dict())
@@ -74,8 +74,8 @@ def flask_post_json():
 
 
 def etagify(resp: flask.Response) -> flask.Response:
-    print('Has ETag:', "etag" in resp.headers)      # TODO: Erase debug statement
-    resp.add_etag()
+    #print('ETag:', resp.get_etag()[0])      # TODO: Erase debug statement
+    resp.add_etag(overwrite=True)
     myWorld.etag = resp.get_etag()[0]
     return resp
 
@@ -101,7 +101,7 @@ def world():
     '''you should probably return the world here'''
     resp = make_response(myWorld.world())
     resp.set_etag(myWorld.etag)
-    print('Has ETag:', "etag" in resp.headers)      # TODO: Erase debug statement
+    print('ETag:', myWorld.etag, 'If-None-Match:', request.if_none_match.to_header())      # TODO: Erase debug statement
     return resp.make_conditional(request)
 
 

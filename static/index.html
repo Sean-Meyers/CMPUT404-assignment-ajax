@@ -54,6 +54,7 @@ function sendJSONXMLHTTPRequest(url, objects, callback) {
 
 
 world = {};
+etag = 'initial etag whatever';
 
 //XXX: TODO Make this prettier!
 function drawCircle(context,entity) {
@@ -261,10 +262,34 @@ mouse.mousedraggers.push(function(x,y,clicked,e) {
 
 
 function update() {
-    //XXX: TODO Get the world from the webservice using a XMLHTTPRequest
+    //DONE: Get the world from the webservice using a fetch().
+    console.log("Update etag: " + etag);
     fetch("http://"+host+"/world", {headers: {
-        // TODO:
-    }})
+        "Content-Type": "application/json",
+        "If-None-Match": etag
+    }}).then((response) => {
+        // status 200:
+        //      get response data json and update the world with it
+        //      when done updating the world, update etag, drawNextFrame()    (May need to double buffer this)
+        // status 304:
+        //      Do Nothing.
+        if (response.ok) {
+            response.json().then((serverWorld) => {
+                // TODO: Update the client world wherever it is different from the server world.
+                    // Requires assigning each entity with the etag/version id that modified it,
+                    // otherwise client side changes that occur while the update is happening will be
+                    // overwritten once the update is completed. Probably this means that things will
+                    // feel janky or laggy.
+
+                // For now, just set the client world = to the server world.
+                world = serverWorld;
+
+                etag = response.headers.get("ETag");
+                console.log("Then etag: " + etag);
+                drawNextFrame();
+            });
+        }
+    });
     drawFrame();
 }
 
