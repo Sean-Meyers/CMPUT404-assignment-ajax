@@ -54,7 +54,7 @@ function sendJSONXMLHTTPRequest(url, objects, callback) {
 
 
 world = {};
-etag = 'initial etag whatever';
+// etag = 'initial etag whatever';
 
 //XXX: TODO Make this prettier!
 function drawCircle(context,entity) {
@@ -260,13 +260,16 @@ mouse.mousedraggers.push(function(x,y,clicked,e) {
                           'radius':10});
 });
 
-
-function update() {
+whatever = {etag: 'None Yet'};
+// TODO: Remove the await and use worker threads and double(or more) buffering? Or just leave it. whatever.
+// Can't let the thing draw while waiting for responses easily it seems. Unless, maybe we can make drawFrame() await the last response after it has finished but before it has returned somehow.
+// Man... premature optimization gets me again.
+async function update() {
     //DONE: Get the world from the webservice using a fetch().
-    console.log("Update etag: " + etag);
-    fetch("http://"+host+"/world", {headers: {
+    console.log("Update etag: " + whatever.etag);
+    await fetch("http://"+host+"/world", {headers: {
         "Content-Type": "application/json",
-        "If-None-Match": etag
+        "If-None-Match": whatever.etag
     }}).then((response) => {
         // status 200:
         //      get response data json and update the world with it
@@ -284,8 +287,8 @@ function update() {
                 // For now, just set the client world = to the server world.
                 world = serverWorld;
 
-                etag = response.headers.get("ETag");
-                console.log("Then etag: " + etag);
+                whatever.etag = response.headers.get("ETag");
+                console.log("Then etag: " + whatever.etag);
                 drawNextFrame();
             });
         }
