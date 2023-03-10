@@ -260,14 +260,13 @@ mouse.mousedraggers.push(function(x,y,clicked,e) {
                           'radius':10});
 });
 
-whatever = {etag: 'None Yet'};
-// TODO: Remove the await and use worker threads and double(or more) buffering? Or just leave it. whatever.
-// Can't let the thing draw while waiting for responses easily it seems. Unless, maybe we can make drawFrame() await the last response after it has finished but before it has returned somehow.
-// Man... premature optimization gets me again.
-async function update() {
-    //DONE: Get the world from the webservice using a fetch().
-    console.log("Update etag: " + whatever.etag);
-    await fetch("http://"+host+"/world", {headers: {
+whatever = {
+    etag: 'None Yet',
+    updatePending: false
+};
+
+function fetchWorld() {
+    fetch("http://"+host+"/world", {headers: {
         "Content-Type": "application/json",
         "If-None-Match": whatever.etag
     }}).then((response) => {
@@ -290,9 +289,25 @@ async function update() {
                 whatever.etag = response.headers.get("ETag");
                 console.log("Then etag: " + whatever.etag);
                 drawNextFrame();
+                whatever.updatePending = false;
             });
+        } else {
+            whatever.updatePending = false;
         }
     });
+}
+
+
+// TODO: Remove the await and use worker threads and double(or more) buffering? Or just leave it. whatever.
+// Can't let the thing draw while waiting for responses easily it seems. Unless, maybe we can make drawFrame() await the last response after it has finished but before it has returned somehow.
+// Man... premature optimization gets me again.
+function update() {
+    //DONE: Get the world from the webservice using a fetch().
+    console.log("Update etag: " + whatever.etag);
+    if (!whatever.updatePending) {
+        fetchWorld();
+        whatever.updatePending = true;
+    }
     drawFrame();
 }
 
