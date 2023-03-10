@@ -142,17 +142,18 @@ whatever = {
 };
 
 function putData(entity, data) {
+    // console.log('putData' + entity);
     return fetch("http://"+host+"/entity/"+entity, {
         method: 'PUT',
         headers: {
             "Content-Type": "application/json"
         },
-        body: data
+        body: JSON.stringify(data)
     }).then((response) => {
         if (response.ok) {
             whatever.etag = response.headers.get("ETag");
         } else {
-            console.log(response.status + ' ' + response.statusText);
+            // console.log(response.status + ' ' + response.statusText);
         }
         whatever.updatePending = false;
     });
@@ -160,7 +161,9 @@ function putData(entity, data) {
 }
 
 function nextPut() {
-    return putData(...whatever.updateQueue.shift());
+    next = whatever.updateQueue.shift()
+    // console.log('nextPut' + next[0]);
+    return putData(...next);
 }
 
 // Done in theory: Make it so that it does not send another PUT request until the response
@@ -298,7 +301,8 @@ mouse.mousedraggers.push(function(x,y,clicked,e) {
 
 
 function fetchWorld() {
-    fetch("http://"+host+"/world", {headers: {
+    whatever.updatePending = true;
+    return fetch("http://"+host+"/world", {headers: {
         "Content-Type": "application/json",
         "If-None-Match": whatever.etag
     }}).then((response) => {
@@ -308,7 +312,7 @@ function fetchWorld() {
         // status 304:
         //      Do Nothing.
         if (response.ok) {
-            response.json().then((serverWorld) => {
+            return response.json().then((serverWorld) => {
                 // TODO: Update the client world wherever it is different from the server world.
                     // Requires assigning each entity with the etag/version id that modified it,
                     // otherwise client side changes that occur while the update is happening will be
@@ -319,20 +323,20 @@ function fetchWorld() {
                 world = serverWorld;
 
                 whatever.etag = response.headers.get("ETag");
-                console.log("Then etag: " + whatever.etag);
+                // console.log("Then etag: " + whatever.etag);
                 drawNextFrame();
                 whatever.updatePending = false;
             });
         } else {
+            // console.log('fetchWorld not 200');
             whatever.updatePending = false;
         }
     });
-    whatever.updatePending = true;
 }
 
-function update() {
+async function update() {
     //DONE: Get the world from the webservice using a fetch().
-    console.log("Update etag: " + whatever.etag);
+    // console.log("Update etag: " + whatever.etag);
     if (!whatever.updatePending) {
         if (whatever.updateQueue.length > 0) {
             nextPut().then(fetchWorld);
