@@ -32,25 +32,25 @@ var W = canvas.width  = window.innerWidth-6;
 var H = canvas.height = window.innerHeight-50;
 
 
-function sendJSONXMLHTTPRequest(url, objects, callback) {
-    var xhr = new XMLHttpRequest();
-    xhr.onreadystatechange = function () {
-        if (xhr.readyState==4) {
-            try {
-                if (xhr.status==200) {
-                    //XXX: parse some JSON from the request!
-                    //XXX: Pass the data to the callback!
-                }
-            } 
-            catch(e) {
-                alert('Error: ' + e.name);
-            }
-        }
-    };
-    //XXX: POST to a URL
-    //XXX: set the mimetype and the accept headers!
-    // Remember to use application/json !
-}
+// function sendJSONXMLHTTPRequest(url, objects, callback) {
+//     var xhr = new XMLHttpRequest();
+//     xhr.onreadystatechange = function () {
+//         if (xhr.readyState==4) {
+//             try {
+//                 if (xhr.status==200) {
+//                     //N/A: parse some JSON from the request!
+//                     //N/A: Pass the data to the callback!
+//                 }
+//             } 
+//             catch(e) {
+//                 alert('Error: ' + e.name);
+//             }
+//         }
+//     };
+//     //N/A: POST to a URL
+//     //N/A: set the mimetype and the accept headers!
+//     // Remember to use application/json !
+// }
 
 
 world = {};
@@ -135,10 +135,48 @@ function getPosition(e) {
 }
 
 
+whatever = {
+    etag: 'None Yet',
+    updatePending: false,
+    updateQueue: []
+};
+
+function putData(entity, data) {
+    fetch("http://"+host+"/entity/"+entity, {
+        method: 'PUT',
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: data
+    }).then((response) => {
+        if (response.ok) {
+            whatever.etag = response.headers.get("ETag");
+        } else {
+            console.log(response.status + ' ' + response.statusText);
+        }
+        whatever.updatePending = false;
+    });
+}
+
+// TODO:
+// function nextPut() {
+//     updateQueue.
+// }
+
+// TODO: Make it so that it does not send another PUT request until the response
+// from the previous one is done processing. Also, make it so that we can still
+// add entities to our world locally while we are waiting, and queue up our
+// changes to PUT sequentially once the previous PUT responses are done.
 function addEntity(entity, data) {
     world[entity] = data;
     drawNextFrame(); // (but should we?)
     //XXX: Send a XHTML Request that updates the entity you just modified!
+    if (!whatever.updatePending) {
+        whatever.updatePending = true;
+        putData();
+    } else {
+        whatever.updateQueue.push({entity: data});
+    }
 
 }
 
@@ -260,10 +298,6 @@ mouse.mousedraggers.push(function(x,y,clicked,e) {
                           'radius':10});
 });
 
-whatever = {
-    etag: 'None Yet',
-    updatePending: false
-};
 
 function fetchWorld() {
     fetch("http://"+host+"/world", {headers: {
@@ -297,10 +331,6 @@ function fetchWorld() {
     });
 }
 
-
-// TODO: Remove the await and use worker threads and double(or more) buffering? Or just leave it. whatever.
-// Can't let the thing draw while waiting for responses easily it seems. Unless, maybe we can make drawFrame() await the last response after it has finished but before it has returned somehow.
-// Man... premature optimization gets me again.
 function update() {
     //DONE: Get the world from the webservice using a fetch().
     console.log("Update etag: " + whatever.etag);
