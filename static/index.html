@@ -142,7 +142,7 @@ whatever = {
 };
 
 function putData(entity, data) {
-    fetch("http://"+host+"/entity/"+entity, {
+    return fetch("http://"+host+"/entity/"+entity, {
         method: 'PUT',
         headers: {
             "Content-Type": "application/json"
@@ -156,28 +156,26 @@ function putData(entity, data) {
         }
         whatever.updatePending = false;
     });
+    whatever.updatePending = true;
 }
 
-// TODO:
-// function nextPut() {
-//     updateQueue.
-// }
+function nextPut() {
+    return putData(...whatever.updateQueue.shift());
+}
 
-// TODO: Make it so that it does not send another PUT request until the response
+// Done in theory: Make it so that it does not send another PUT request until the response
 // from the previous one is done processing. Also, make it so that we can still
 // add entities to our world locally while we are waiting, and queue up our
 // changes to PUT sequentially once the previous PUT responses are done.
 function addEntity(entity, data) {
     world[entity] = data;
     drawNextFrame(); // (but should we?)
-    //XXX: Send a XHTML Request that updates the entity you just modified!
+    //DONE: Send a fetch Request that updates the entity you just modified!
     if (!whatever.updatePending) {
-        whatever.updatePending = true;
-        putData();
+        putData(entity, data);
     } else {
-        whatever.updateQueue.push({entity: data});
+        whatever.updateQueue.push([entity, data]);
     }
-
 }
 
 var counter = 0;
@@ -329,14 +327,18 @@ function fetchWorld() {
             whatever.updatePending = false;
         }
     });
+    whatever.updatePending = true;
 }
 
 function update() {
     //DONE: Get the world from the webservice using a fetch().
     console.log("Update etag: " + whatever.etag);
     if (!whatever.updatePending) {
-        fetchWorld();
-        whatever.updatePending = true;
+        if (whatever.updateQueue.length > 0) {
+            nextPut().then(fetchWorld);
+        } else {
+            fetchWorld();
+        }
     }
     drawFrame();
 }
