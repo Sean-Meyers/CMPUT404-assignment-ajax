@@ -138,7 +138,15 @@ function getPosition(e) {
 whatever = {
     etag: 'None Yet',
     updatePending: false,
-    updateQueue: []
+    updateQueue: [],
+    etagTime: 'X0',
+    updateEtag: function (newTag) {
+        whatever.etag = newTag;
+        // whatever.etagTime = 'X'+Date.now();
+    },
+    getEtagTime: () => {
+        return this.etagTime
+    }
 };
 
 function putData(entity, data) {
@@ -151,7 +159,8 @@ function putData(entity, data) {
         body: JSON.stringify(data)
     }).then((response) => {
         if (response.ok) {
-            whatever.etag = response.headers.get("ETag");
+            whatever.updateEtag(response.headers.get("ETag"));
+            // whatever.etag = response.headers.get("ETag");
         } else {
             // console.log(response.status + ' ' + response.statusText);
         }
@@ -166,12 +175,23 @@ function nextPut() {
     return putData(...next);
 }
 
+buffer = [];
+timerSet = false;
 // Done in theory: Make it so that it does not send another PUT request until the response
 // from the previous one is done processing. Also, make it so that we can still
 // add entities to our world locally while we are waiting, and queue up our
 // changes to PUT sequentially once the previous PUT responses are done.
 function addEntity(entity, data) {
     world[entity] = data;
+    buffer.push([entity, data]);
+    if (!timerSet) {
+        setTimeout(() => {
+            timerSet = false;
+            putData(Date.now(), buffer);
+            buffer = [];
+        }, 1000);
+        timerSet = true;
+    }
     drawNextFrame(); // (but should we?)
     //DONE: Send a fetch Request that updates the entity you just modified!
     if (!whatever.updatePending) {
@@ -184,8 +204,11 @@ function addEntity(entity, data) {
 var counter = 0;
 function addEntityWithoutName(data) {
     //var name = "X"+Math.floor((Math.random()*100)+1);
-    var name = "X"+(counter++)%100;
+    // var name = "X"+(counter++)%100;
+    var name = "X"+Date.now();
     addEntity(name,data);
+    whatever.etagTime = name;
+    // console.log(whatever.etagTime)
 }
 
 // canvas + mouse/touch is complicated 
@@ -302,16 +325,21 @@ mouse.mousedraggers.push(function(x,y,clicked,e) {
 
 function fetchWorld() {
     whatever.updatePending = true;
+    // console.log(whatever.etagTime);
     return fetch("http://"+host+"/world", {headers: {
         "Content-Type": "application/json",
-        "If-None-Match": whatever.etag
-    }}).then((response) => {
+        "If-None-Match": whatever.etag,
+        "If-Range": whatever.etagTime
+        }
+    }).then((response) => {
         // status 200:
         //      get response data json and update the world with it
         //      when done updating the world, update etag, drawNextFrame()    (May need to double buffer this)
         // status 304:
         //      Do Nothing.
         if (response.ok) {
+            whatever.updateEtag(response.headers.get("ETag"));
+            // whatever.etag = response.headers.get("ETag");
             return response.json().then((serverWorld) => {
                 // TODO: Update the client world wherever it is different from the server world.
                     // Requires assigning each entity with the etag/version id that modified it,
@@ -320,9 +348,14 @@ function fetchWorld() {
                     // feel janky or laggy.
 
                 // For now, just set the client world = to the server world.
-                world = serverWorld;
-
-                whatever.etag = response.headers.get("ETag");
+                // world = serverWorld;
+                // TODO: This won't work if we ever want the user to be able to erase stuff.
+                for (const key of Object.keys(serverWorld)) {
+                    if (!world[key]) {
+                        world[key] = serverWorld[key];
+                        whatever.etagTime = key
+                    }
+                }
                 // console.log("Then etag: " + whatever.etag);
                 drawNextFrame();
                 whatever.updatePending = false;
@@ -334,15 +367,21 @@ function fetchWorld() {
     });
 }
 
+
+pollTimerSet = false;
 async function update() {
     //DONE: Get the world from the webservice using a fetch().
     // console.log("Update etag: " + whatever.etag);
-    if (!whatever.updatePending) {
-        if (whatever.updateQueue.length > 0) {
-            nextPut().then(fetchWorld);
-        } else {
-            fetchWorld();
-        }
+    if (!whatever.updatePending && !pollTimerSet) {
+        pollTimerSet = true;
+        setTimeout(() => {
+            if (whatever.updateQueue.length > 0) {
+                nextPut().then(fetchWorld);
+            } else {
+                fetchWorld();
+            }
+            pollTimerSet = false;
+        }, 1000/5);
     }
     drawFrame();
 }

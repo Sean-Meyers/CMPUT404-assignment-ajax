@@ -24,6 +24,11 @@
 import flask
 from flask import Flask, request, redirect, make_response
 import json
+# import flask.cli    
+# flask.cli.show_server_banner = lambda *args: None
+
+# import logging
+# logging.getLogger("werkzeug").disabled = True
 app = Flask(__name__)
 app.debug = True
 
@@ -52,8 +57,15 @@ class World:
     def get(self, entity):
         return self.space.get(entity,dict())
     
-    def world(self):
-        return self.space
+    def world(self, etagTime=None):
+        unfamiliarWorld = {}
+        if etagTime:
+            # print('etagTime', etagTime)
+            for key, value in self.space.items():
+                if key > etagTime and key != etagTime:
+                    unfamiliarWorld[key] = value
+            return unfamiliarWorld
+        return {}#self.space
 
 # you can test your webservice from the commandline
 # curl -v   -H "Content-Type: application/json" -X PUT http://127.0.0.1:5000/entity/X -d '{"x":1,"y":1}' 
@@ -74,7 +86,6 @@ def flask_post_json():
 
 
 def etagify(resp: flask.Response) -> flask.Response:
-    #print('ETag:', resp.get_etag()[0])      # TODO: Erase debug statement
     resp.add_etag(overwrite=True)
     myWorld.etag = resp.get_etag()[0]
     return resp
@@ -89,20 +100,31 @@ def hello():
 @app.route("/entity/<entity>", methods=['POST','PUT'])
 def update(entity):
     '''update the entities via this interface'''
+    # print('got request to update')
     update_data = flask_post_json()
-    for key, val in update_data.items():
-        myWorld.update(entity, key, val)
+    if type(update_data) == list:
+        for thing in update_data:
+            for k, v in thing[1].items():
+                myWorld.update(thing[0], k, v)
+    else:          
+        for key, val in update_data.items():
+            myWorld.update(entity, key, val)
     resp = make_response(myWorld.get(entity))
-    return etagify(resp)
+    resp = etagify(resp)
+    # print('updated world', myWorld.etag)
+    return resp
 
 
 @app.route("/world", methods=['POST','GET'])    
 def world():
     '''you should probably return the world here'''
-    resp = make_response(myWorld.world())
+    etagTime = request.if_range.to_header()
+    resp = make_response(myWorld.world(etagTime))
     resp.set_etag(myWorld.etag)
-    print('ETag:', myWorld.etag, 'If-None-Match:', request.if_none_match.to_header())      # TODO: Erase debug statement
-    return resp.make_conditional(request)
+    resp = resp.make_conditional(request)
+    # if resp.status_code == 200:
+    #     print('sending world', myWorld.etag)
+    return resp
 
 
 @app.route("/entity/<entity>")    
