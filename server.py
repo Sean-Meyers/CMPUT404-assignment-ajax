@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
-# Copyright 2013 Abram Hindle
+# Copyright 2023 Abram Hindle, Sean Meyers
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@ class World:
         if etagTime:
             # print('etagTime', etagTime)
             for key, value in self.space.items():
-                if key > etagTime and key != etagTime:
+                if int(key[2:-1]) > int(etagTime[2:-1]):
                     unfamiliarWorld[key] = value
             return unfamiliarWorld
         return self.space
